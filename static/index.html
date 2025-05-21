@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dự đoán Viêm Phổi từ ảnh X-quang</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', sans-serif;
+      background-color: #f4f9ff;
+      height: 100%;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    h2 {
+      text-align: center;
+      color: #0077cc;
+    }
+
+    #upload-form {
+      max-width: 600px;
+      margin: 0 auto 15px;
+      text-align: center;
+    }
+
+    #drop-zone {
+      border: 2px dashed #0077cc;
+      border-radius: 8px;
+      padding: 40px;
+      cursor: pointer;
+      color: #0077cc;
+      font-weight: 600;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+      user-select: none;
+      margin-bottom: 15px;
+    }
+
+    #drop-zone.dragover {
+      background-color: #d6eaff;
+      border-color: #005fa3;
+    }
+
+    #drop-zone:hover {
+      background-color: #e6f2ff;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    button {
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    #loading {
+      display: none;
+      text-align: center;
+      margin-bottom: 20px;
+      font-weight: bold;
+      color: #0077cc;
+    }
+
+    #results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      max-width: 900px;
+      margin: 0 auto 30px;
+      flex-grow: 1;
+    }
+
+    .result-block {
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      padding: 15px;
+      text-align: center;
+      transition: transform 0.2s;
+      border-left: 5px solid #0077cc;
+    }
+
+    .result-block:hover {
+      transform: translateY(-4px);
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .confidence {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .label-pneumonia {
+      color: red;
+      font-weight: bold;
+    }
+
+    .label-normal {
+      color: green;
+      font-weight: bold;
+    }
+
+    #multi-upload-note {
+      max-width: 600px;
+      margin: 15px auto 30px;
+      color: #555;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    footer {
+      background-color: #f0f0f0;
+      text-align: center;
+      margin-top: auto;
+      padding: 15px 0 10px 0;
+      color: #777;
+      font-size: 14px;
+    }
+
+    footer a {
+      color: #0077cc;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Dự đoán Viêm Phổi từ ảnh X-quang</h2>
+
+    <form id="upload-form">
+      <div id="drop-zone">
+        Kéo thả ảnh vào đây hoặc <span style="text-decoration: underline; cursor: pointer;">chọn ảnh</span>
+      </div>
+      <input type="file" id="images" accept="image/*" multiple required />
+      <div id="multi-upload-note">Bạn có thể chọn nhiều ảnh cùng lúc.</div>
+      <button type="submit">Dự đoán</button>
+    </form>
+
+    <div id="loading">⏳ Đang phân tích ảnh...</div>
+    <div id="results"></div>
+
+    <footer>
+      © 2025 - AI Chẩn đoán Viêm phổi. Liên hệ: <a href="mailto:quyetle.da@gmail.com">quyetle.da@gmail.com</a>
+    </footer>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("images");
+    const loadingDiv = document.getElementById("loading");
+    const resultsDiv = document.getElementById("results");
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        dropZone.textContent = `${fileInput.files.length} ảnh đã chọn`;
+      } else {
+        dropZone.innerHTML = 'Kéo thả ảnh vào đây hoặc <span style="text-decoration: underline; cursor: pointer;">chọn ảnh</span>';
+      }
+    });
+
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+
+    dropZone.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+
+      const droppedFiles = e.dataTransfer.files;
+      if (droppedFiles.length > 0) {
+        const dataTransfer = new DataTransfer();
+        for (let i = 0; i < fileInput.files.length; i++) {
+          dataTransfer.items.add(fileInput.files[i]);
+        }
+        for (let i = 0; i < droppedFiles.length; i++) {
+          dataTransfer.items.add(droppedFiles[i]);
+        }
+        fileInput.files = dataTransfer.files;
+        dropZone.textContent = `${fileInput.files.length} ảnh đã chọn`;
+      }
+    });
+
+    document.getElementById('upload-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const files = fileInput.files;
+
+      if (files.length === 0) {
+        alert("Vui lòng chọn ít nhất một ảnh để dự đoán.");
+        return;
+      }
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("files", file);
+      }
+
+      loadingDiv.style.display = "block";
+      resultsDiv.innerHTML = "";
+
+      try {
+        const res = await fetch("/predict", {
+          method: "POST",
+          body: formData
+        });
+
+        loadingDiv.style.display = "none";
+        const data = await res.json();
+
+        if (res.ok) {
+          data.forEach((item, index) => {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const resultBlock = document.createElement("div");
+              resultBlock.className = "result-block";
+
+              const img = document.createElement("img");
+              img.src = e.target.result;
+
+              const info = document.createElement("p");
+              const labelClass = item.prediction === "PNEUMONIA" ? "label-pneumonia" : "label-normal";
+
+              if (item.error) {
+                info.innerHTML = `<strong>${item.filename}</strong>: Lỗi - ${item.error}`;
+              } else {
+                info.innerHTML = `
+                  <span class="${labelClass}">${item.prediction}</span><br>
+                  <span class="confidence">Độ tin cậy: ${(item.confidence * 100).toFixed(2)}%</span>
+                `;
+              }
+
+              resultBlock.appendChild(img);
+              resultBlock.appendChild(info);
+              resultsDiv.appendChild(resultBlock);
+            };
+            reader.readAsDataURL(files[index]);
+          });
+        } else {
+          resultsDiv.innerHTML = `<p style="color: red;">Lỗi: ${data.detail || "Không xác định"}</p>`;
+        }
+      } catch (error) {
+        loadingDiv.style.display = "none";
+        resultsDiv.innerHTML = `<p style="color: red;">Có lỗi xảy ra khi gửi dữ liệu.</p>`;
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Build lại image
+docker build -t pneumonia-api .
+
+# Chạy container
+docker run -p 8000:8000 pneumonia-api

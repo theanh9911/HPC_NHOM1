@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  web:
+    image: pneumonia-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    networks:
+      - hpc-network
+
+networks:
+  hpc-network:
+    driver: overlay
