@@ -1,39 +1,115 @@
-# Build stage
-FROM python:3.9-slim AS builder
+# Hướng dẫn triển khai ứng dụng Pneumonia Detection trên Minikube/Kubernetes
 
-WORKDIR /app
+## Yêu cầu hệ thống
 
-# Cài đặt các thư viện hệ thống cần thiết cho TensorFlow và Pillow
-RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxrender1 libxext6 && rm -rf /var/lib/apt/lists/*
+- Docker Desktop
+- Minikube
+- kubectl
+- Python 3.8+
+- pip
 
-# Chỉ copy requirements để tận dụng cache layer
-COPY requirements.txt .
+## Cài đặt môi trường
 
-# Cài đặt các dependencies cần thiết
-RUN pip install --no-cache-dir numpy==1.23.5 && \
-    pip install --no-cache-dir -r requirements.txt
+1. Cài đặt Minikube:
+```bash
+# Windows (PowerShell với quyền Administrator)
+winget install minikube
 
-# Final stage
-FROM python:3.9-slim
+# Khởi động Minikube
+minikube start
+minikube start --nodes=3 --cpus=4 --memory=2048 --driver=docker
+```
 
-WORKDIR /app
+2. Kiểm tra cài đặt:
+```bash
+minikube status
+kubectl version
+```
 
-# Copy các dependencies và executable scripts từ builder
-COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
-COPY --from=builder /usr/local/bin/ /usr/local/bin/
+## Các bước triển khai
 
-# Copy các file cần thiết
-COPY main.py .
-COPY model/ model/
+### 1. Build Docker Image
 
-# Tạo thư mục static và copy index.html vào đó
-RUN mkdir -p static
-COPY static/index.html static/
+```bash
+# Di chuyển vào thư mục chứa Dockerfile
+cd <đường_dẫn_thư_mục_project>
 
-# Set permissions
-RUN chmod -R 755 /app
+# Build Docker image
+docker build -t pneumonia-detection:latest .
 
-EXPOSE 8000
+# Load image vào Minikube
+minikube image load pneumonia-detection:latest
+```
 
-# Chỉ định worker process
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8000", "--workers", "4"]
+### 2. Triển khai trên Kubernetes
+
+```bash
+# Áp dụng file deployment
+kubectl apply -f pneumonia-deployment.yaml
+
+# Kiểm tra trạng thái deployment
+kubectl get deployments
+kubectl get pods
+kubectl get services
+```
+
+### 3. Truy cập ứng dụng
+
+```bash
+# Mở port-forward để truy cập ứng dụng
+minikube service pneumonia-service
+```
+
+## Kiểm tra ứng dụng
+
+1. Mở trình duyệt web  
+2. Upload ảnh X-quang để kiểm tra
+3. Xem kết quả phân tích
+
+## Load Testing (Tùy chọn)
+
+Để chạy load test với Locust:
+
+```bash
+# Cài đặt Locust
+pip install locust
+
+# Chạy load test
+locust -f locustfile.py --host <link-web>
+```
+
+Truy cập http://localhost:8089 để cấu hình và chạy load test.
+
+## Xử lý sự cố
+
+1. Kiểm tra logs của pod:
+```bash
+kubectl logs <pod_name>
+```
+
+2. Kiểm tra trạng thái pod:
+```bash
+kubectl describe pod <pod_name>
+```
+
+3. Khởi động lại deployment nếu cần:
+```bash
+kubectl rollout restart deployment pneumonia-deployment
+```
+
+## Dọn dẹp
+
+```bash
+# Xóa deployment
+kubectl delete -f pneumonia-deployment.yaml
+
+# Dừng Minikube
+minikube stop
+```
+
+## Lưu ý
+
+- Đảm bảo Minikube đã được khởi động trước khi triển khai
+- Model file (model_5.pth) cần được đặt trong thư mục project
+- Các port mặc định: 8000 (ứng dụng), 8089 (Locust)
+- Đảm bảo có đủ tài nguyên hệ thống cho Minikube (ít nhất 4GB RAM) 
